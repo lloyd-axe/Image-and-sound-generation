@@ -5,7 +5,6 @@ import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras import backend as K
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.losses import MeanSquaredError
 from tensorflow.keras.layers import Input, Conv2D, ReLU, BatchNormalization, Flatten, Dense, Reshape, Conv2DTranspose, Activation, Lambda
 
 tf.compat.v1.disable_eager_execution()
@@ -174,9 +173,9 @@ class VarAutoencoder:
     def _save_parameters(self, path):
         parameters = [
             self.input_shape,
-            self.conv_filters,
-            self.conv_kernels,
-            self.conv_strides,
+            self.filters,
+            self.kernels,
+            self.strides,
             self.latent_space_dim
         ]
         with open(os.path.join(path, 'parameters.pkl'), "wb") as f:
