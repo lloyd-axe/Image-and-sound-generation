@@ -1,5 +1,8 @@
+import os
+import pickle
 import librosa
 import numpy as np
+import soundfile as sf
 import matplotlib.pyplot as plt
 
 from tensorflow.keras.datasets import mnist #MNIST dataset
@@ -13,12 +16,12 @@ class ImageGenerator:
         self.generated_imgs = None
         self.latent_representation = None
 
-    def generate(self, data, labels, samples, plot = True):
+    def generate(self, data, labels, samples, show = True):
         self.samples = samples
         self.sample_imgs, self.sample_labels = self._select_images(data, labels)
         self.generated_imgs, self.latent_representation = self.autoencoder.reconstruct(self.sample_imgs)
         
-        if plot:
+        if show:
             self._plot_images()
 
     def _select_images(self, data, labels):
@@ -59,7 +62,7 @@ class SoundGenerator:
     def generate(self, spectrogram, min_max):
         generated_spec, latent_rep = self.autoencoder.reconstruct(spectrogram)
         signals = self.convert_spec_to_audio(generated_spec, min_max)
-        return signals, latent_rep
+        return signals, latent_rep, generated_spec
 
     def convert_spec_to_audio(self, spectrograms, min_max):
         signals = []
@@ -67,6 +70,43 @@ class SoundGenerator:
             log_spectrogram = spec[:, :, 0]
             denormalized_spectrogram = self.normalizer.denormalize(log_spectrogram, mm_val['min'], mm_val['max'])
             ampli = librosa.db_to_amplitude(denormalized_spectrogram)
-            signals.appen(librosa.istft(ampli, hop_length=self.hop_length))
+            signals.append(librosa.istft(ampli, hop_length=self.hop_length))
         return signals
+
+    @staticmethod
+    def load_audio_npy_dir(path):
+        x_train = []
+        file_paths = []
+        for root, _ , files in os.walk(path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                spectrogram = np.load(file_path)
+                x_train.append(spectrogram)
+                file_paths.append(file_path)
+        x_train = np.array(x_train)
+        x_train = x_train[..., np.newaxis]
+        return x_train, file_paths
+
+    @staticmethod
+    def select_spectrograms(spectrograms, files_paths, min_max_path, samples):
+        #Select few samples spectrogram
+        sampled_idx = np.random.choice(range(len(spectrograms)), samples)
+        samp_spectrogram = spectrograms[sampled_idx]
+
+        file_paths = [files_paths[idx] for idx in sampled_idx]
+        with open(os.path.join(min_max_path, 'min_max.pkl'), 'rb') as f:
+            min_max = pickle.load(f)
+        samp_min_max = [min_max[file_path] for file_path in file_paths]
+        return samp_spectrogram, samp_min_max
+
+    @staticmethod
+    def save_signals(signals, save_dir, sample_rate = 22050):
+        #save singals (numerical data) into audio files
+        for i, signal in enumerate(signals):
+            save_path = os.path.join(save_dir, str(i) + ".wav")
+            sf.write(save_path, signal, sample_rate)
+
+
+    
+
     
